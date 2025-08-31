@@ -1,0 +1,44 @@
+Examples: 
+
+root@nas:/Data# bash ./get_expansion_ratio.sh -p Data -t 5008972  --progress-seconds 5 Data/Storage/Photos
+[2025-08-31T07:39:04Z] [init] starting get_expansion_ratio (args: -p Data -t 5008972 --progress-seconds 5 Data/Storage/Photos)
+awk: cmd. line:2:       BEGIN { in=0; p=0; n=0 }
+awk: cmd. line:2:               ^ syntax error
+^C[2025-08-31T07:39:15Z] [exit] status=0
+
+root@nas:/Data# bash ./get_expansion_ratio.sh -p Data -t 5008972  --progress-seconds 5 Data/Storage/Photos
+[2025-08-31T07:42:38Z] [init] starting get_expansion_ratio (args: -p Data -t 5008972 --progress-seconds 5 Data/Storage/Photos)
+[2025-08-31T07:43:01Z] [layout] chosen Old N=8, New N=8, P=2 (source=history)
+ZFS Old/New Layout Audit
+Started:       2025-08-31T07:43:01Z
+Pool:          Data
+Expansion TXG:  5008972
+Output log:    zfs-oldlayout-report-Data-txg5008972-20250831-074238.log
+Recursion:     disabled
+Explicit datasets provided (1): Data/Storage/Photos
+Detected RAIDZ parities: 2
+Detected widths (N):     8
+Assumed Old/New/Parity:  N_old=8, N_new=8, P=2  (source=history)
+Progress:      enabled
+  - progress seconds: 5
+  - progress GiB:     1
+  - check lines:      4096
+  - denom mode:       logical
+  - progress to log:  no
+  - debug tracing:    off
+
+Dataset, OLD_layout_bytes, NEW_layout_bytes, OLD%, NEW%
+Enumerating datasets to scan
+[2025-08-31T07:43:01Z] [progress] will scan 1 dataset(s)
+[2025-08-31T07:43:01Z] [dataset] Data/Storage/Photos size: used=401 GiB, usedbydataset=401 GiB, snaps=426 KiB, children=0 B (denom=logical)
+[2025-08-31T07:43:01Z] [estimate] Data/Storage/Photos Old N,P: N=8,P=2; est_physical=535 GiB | New N,P: N=8,P=2; est_physical=535 GiB | potential savings: ~0 (same width)
+[2025-08-31T07:43:01Z] [progress] scanning Data/Storage/Photos ...
+[2025-08-31T07:44:58Z] [progress] Data/Storage/Photos  Total=520 MiB/401 GiB  OLD=520 MiB  NEW=0 B
+[2025-08-31T07:45:33Z] [progress] Data/Storage/Photos  Total=1 GiB/401 GiB  OLD=1 GiB  NEW=0 B
+[2025-08-31T07:46:03Z] [progress] Data/Storage/Photos  Total=3 GiB/401 GiB  OLD=3 GiB  NEW=0 B
+[2025-08-31T07:46:39Z] [progress] Data/Storage/Photos  Total=4 GiB/401 GiB  OLD=4 GiB  NEW=0 B
+[2025-08-31T07:47:08Z] [progress] Data/Storage/Photos  Total=6 GiB/401 GiB  OLD=6 GiB  NEW=0 B
+
+......
+
+
