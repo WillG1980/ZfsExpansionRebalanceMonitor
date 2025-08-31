@@ -76,7 +76,7 @@ sudo bash ./get_expansion_ratio.sh -p Data -t 5020371 \
 | `--time "YYYY-MM-DD HH:MM:SS"` | Map timestamp to TXG using uberblocks. |
 | `-r, --recursive` | Scan all datasets under the pool (ignores explicit dataset args). |
 | `-o, --output <file>` | Log file path (defaults to timestamped file). |
-| `--denom logical|physical` | Denominator for progress `Total` (default `logical`). |
+| `--denom logical\|physical` | Denominator for progress `Total` (default `logical`). |
 | `--old_drive_count <N_old>` | Force old RAIDZ width (N). |
 | `--new_drive_count <N_new>` | Force new RAIDZ width (N). |
 | `--parity <P>` | Force parity columns (1, 2, or 3). |
