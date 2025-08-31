@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>get_expansion_ratio.sh — ZFS Old/New Layout Audit</title>
+  <style>
+    :root{
+      --bg: #0b1020;
+      --card: #121933;
+      --muted: #162045;
+      --text: #e7ecff;
+      --subtext: #b7c1ff;
+      --accent: #7aa2ff;
+      --accent-2: #88f7c8;
+      --warn: #ffd166;
+      --error: #ff6b6b;
+      --ok: #7cffcb;
+      --code-bg: #0e1630;
+      --border: #2a3668;
+      --link: #8ab4ff;
+      --table-head: #1b2650;
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg: #f7f8ff;
+        --card: #ffffff;
+        --muted: #eef2ff;
+        --text: #1a2240;
+        --subtext: #3c4a7a;
+        --accent: #275df0;
+        --accent-2: #0aa17f;
+        --warn: #b88200;
+        --error: #bf1f2f;
+        --ok: #0f8c5a;
+        --code-bg: #f3f5ff;
+        --border: #e2e7ff;
+        --link: #1d4ed8;
+        --table-head: #eef2ff;
+      }
+    }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", "Apple Color Emoji","Segoe UI Emoji"; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 1024px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .hero {
+      background: linear-gradient(135deg, rgba(122,162,255,0.12), rgba(136,247,200,0.10));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .title { font-size: clamp(1.6rem, 3.2vw, 2.2rem); letter-spacing: .2px; line-height: 1.15; margin: 0 0 .4rem; }
+    .subtitle { color: var(--subtext); margin: 0 0 1rem; }
+    .badges { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0 0; }
+    .badge {
+      font-size: .8rem; padding: .35rem .6rem; border-radius: 999px; border: 1px solid var(--border);
+      background: var(--card); color: var(--subtext);
+    }
+    .badge.ok { color: var(--ok); border-color: rgba(124,255,203,.5); }
+    .badge.warn { color: var(--warn); border-color: rgba(255,209,102,.5); }
+    .badge.accent { color: var(--accent-2); border-color: rgba(136,247,200,.35); }
+    .grid { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+    @media (min-width: 880px){ .grid-2 { grid-template-columns: 1fr 1fr; } }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1rem 1.1rem;
+    }
+    h2 { margin: 1.2rem 0 .6rem; font-size: 1.3rem; }
+    h3 { margin: 1rem 0 .5rem; font-size: 1.05rem; color: var(--accent); }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--muted);
+      padding: .8rem 1rem;
+      border-radius: 8px;
+      margin: .8rem 0;
+    }
+    .callout.warn{ border-left-color: var(--warn); }
+    .callout.err{ border-left-color: var(--error); }
+    pre, code, kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: .92rem;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: .9rem 1rem;
+      overflow-x: auto;
+      line-height: 1.35;
+    }
+    code.inline { background: var(--muted); color: var(--text); border-radius: .4rem; padding: .12rem .36rem; }
+    .hr { height: 1px; background: var(--border); margin: 1.5rem 0; }
+    table { border-collapse: collapse; width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    th, td { padding: .65rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    thead th { background: var(--table-head); color: var(--subtext); font-weight: 600; }
+    tbody tr:hover { background: rgba(122,162,255,0.06); }
+    .mini { color: var(--subtext); font-size: .92rem; }
+    .pill {
+      display: inline-block; padding: .18rem .5rem; border-radius: .5rem; border: 1px solid var(--border);
+      background: var(--muted); color: var(--subtext); font-size: .8rem; margin-left: .4rem;
+    }
+    .toc { display: flex; flex-wrap: wrap; gap: .5rem .9rem; margin: .6rem 0 0; }
+    .toc a { font-size: .95rem; }
+    .kitchen { border: 1px dashed var(--border); padding: 1rem; border-radius: 12px; background: linear-gradient(180deg, rgba(122,162,255,.06), rgba(136,247,200,.05)); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1 class="title">get_expansion_ratio.sh</h1>
+      <p class="subtitle">Audit how much of your ZFS data still lives on the <strong>old RAIDZ layout</strong> after expansion, estimate the <strong>space you'd save</strong> by rewriting it to the <strong>new layout</strong>, and watch live, timestamped progress.</p>
+      <div class="badges">
+        <span class="badge ok">Read‑only</span>
+        <span class="badge accent">ZFS: zfs/zdb/zpool</span>
+        <span class="badge">TXG boundary</span>
+        <span class="badge warn">No JS · Inline CSS</span>
+      </div>
+      <div class="toc">
+        <a href="#overview">Overview</a>
+        <a href="#quick-start">Quick start</a>
+        <a href="#options">Options</a>
+        <a href="#denominators">Denominators</a>
+        <a href="#examples">Examples</a>
+        <a href="#output">Sample output</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+      </div>
+    </section>
+
+    <section id="overview" class="card">
+      <h2>What it does</h2>
+      <ul>
+        <li>Parses <code class="inline">zdb -ddddd &lt;dataset&gt;</code> to classify blocks as <em>OLD</em> vs <em>NEW</em> using a TXG boundary you supply (<code class="inline">-t</code> or <code class="inline">--time</code>).</li>
+        <li>Auto-detects RAIDZ parity/widths from <code class="inline">zpool status</code> and, if not provided, tries to infer old→new widths from <code class="inline">zpool history -il</code>.</li>
+        <li>Before scanning each dataset, prints an estimate banner showing:<br/>
+          <strong>Old N,P</strong> and <strong>New N,P</strong> with <em>estimated physical size</em> if all data were old vs new, plus <strong>potential savings</strong>.</li>
+        <li>Live progress with timestamps: <span class="pill">Total=&lt;processed&gt;/&lt;denominator&gt;</span> <span class="pill">OLD=&lt;bytes&gt;</span> <span class="pill">NEW=&lt;bytes&gt;</span></li>
+        <li>CSV-ish line per dataset and an overall summary with computed percentages and savings.</li>
+      </ul>
+      <div class="callout">
+        <strong>Safe:</strong> The script never modifies your pool. It only reads metadata using <code class="inline">zdb</code>, <code class="inline">zfs</code>, and <code class="inline">zpool</code>.
+      </div>
+    </section>
+
+    <div class="grid grid-2">
+      <section class="card">
+        <h2>How “OLD vs NEW” is decided</h2>
+        <p>Each block has a <em>birth TXG</em>. You provide a boundary via:</p>
+        <ul>
+          <li><code class="inline">-t &lt;TXG&gt;</code> — explicit, or</li>
+          <li><code class="inline">--time "YYYY-MM-DD HH:MM:SS"</code> — the script maps the timestamp to the next uberblock TXG via <code class="inline">zdb -u</code> or <code class="inline">zdb -l</code>.</li>
+        </ul>
+        <p>Blocks with <code class="inline">birthTXG &lt; TXG</code> → <strong>OLD</strong>; otherwise <strong>NEW</strong>.</p>
+      </section>
+
+      <section class="card">
+        <h2>Parity math (estimates)</h2>
+        <p>For RAIDZ with width <code class="inline">N</code> and parity <code class="inline">P</code>:</p>
+        <pre><code>Physical ≈ Logical × N / (N − P)</code></pre>
+        <p>Expanding increases <code class="inline">N</code> while <code class="inline">P</code> stays the same → lower overhead after rewrite.</p>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Requirements</h2>
+      <ul>
+        <li>Linux with ZFS utilities: <code class="inline">zfs</code>, <code class="inline">zdb</code>, <code class="inline">zpool</code></li>
+        <li><code class="inline">bash</code>, <code class="inline">awk</code>, <code class="inline">date</code></li>
+        <li>Root/sudo recommended (for <code class="inline">zdb</code> and <code class="inline">zpool history</code>)</li>
+      </ul>
+    </section>
+
+    <section id="quick-start" class="card">
+      <h2>Quick start</h2>
+      <h3>Single dataset with a known TXG</h3>
+      <pre><code class="language-bash">sudo bash ./get_expansion_ratio.sh -p Data -t 5020371 Data/Storage/Photos</code></pre>
+
+      <h3>All datasets (recursive), map wall-clock time to TXG, and use physical denominator</h3>
+      <pre><code class="language-bash">sudo bash ./get_expansion_ratio.sh -p Data --time "2025-08-01 00:00:00" -r --denom physical</code></pre>
+
+      <h3>Override expansion widths &amp; parity explicitly</h3>
+      <pre><code class="language-bash">sudo bash ./get_expansion_ratio.sh -p Data -t 5020371 \
+  --old_drive_count 7 --new_drive_count 10 --parity 2 \
+  Data/Storage/Photos</code></pre>
+    </section>
+
+    <section id="denominators" class="card">
+      <h2>Denominator modes for progress</h2>
+      <ul>
+        <li><strong>logical</strong> (default): <code class="inline">usedbydataset + usedbysnapshots</code>. Useful to visualize parity/overhead; progress may exceed 100%.</li>
+        <li><strong>physical</strong>: pre-pass sums ASIZE; <em>Total</em> becomes a true 0–100% progress for this job.</li>
+      </ul>
+      <div class="callout warn">
+        Prefer <strong>physical</strong> if you want a strict progress bar. The pre-pass adds time but improves clarity.
+      </div>
+    </section>
+
+    <section id="options" class="card">
+      <h2>Options</h2>
+      <table>
+        <thead><tr><th>Option</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code class="inline">-p, --pool &lt;name&gt;</code></td><td>Pool name (required).</td></tr>
+          <tr><td><code class="inline">-t, --txg &lt;TXG&gt;</code></td><td>Boundary TXG (expansion point). Use either this or <code class="inline">--time</code>.</td></tr>
+          <tr><td><code class="inline">--time "YYYY-MM-DD HH:MM:SS"</code></td><td>Map timestamp to TXG using uberblocks.</td></tr>
+          <tr><td><code class="inline">-r, --recursive</code></td><td>Scan all datasets under the pool (ignores explicit dataset args).</td></tr>
+          <tr><td><code class="inline">-o, --output &lt;file&gt;</code></td><td>Log file path (defaults to timestamped file).</td></tr>
+          <tr><td><code class="inline">--denom logical|physical</code></td><td>Denominator for progress <em>Total</em> (default <code class="inline">logical</code>).</td></tr>
+          <tr><td><code class="inline">--old_drive_count &lt;N_old&gt;</code></td><td>Force old RAIDZ width (N).</td></tr>
+          <tr><td><code class="inline">--new_drive_count &lt;N_new&gt;</code></td><td>Force new RAIDZ width (N).</td></tr>
+          <tr><td><code class="inline">--parity &lt;P&gt;</code></td><td>Force parity columns (1, 2, or 3).</td></tr>
+          <tr><td><code class="inline">--progress / --no-progress</code></td><td>Enable/disable progress lines (default enabled).</td></tr>
+          <tr><td><code class="inline">--progress-seconds &lt;N&gt;</code></td><td>Emit progress at least every N seconds (default 10).</td></tr>
+          <tr><td><code class="inline">--progress-gib &lt;M&gt;</code></td><td>Emit progress after M GiB additional processed (default 1; 0 to disable byte trigger).</td></tr>
+          <tr><td><code class="inline">--progress-to-log</code></td><td>Duplicate progress lines to the log file.</td></tr>
+          <tr><td><code class="inline">--check-lines &lt;N&gt;</code></td><td>Check progress every N parsed lines (default 4096).</td></tr>
+          <tr><td><code class="inline">--debug</code></td><td>Shell tracing for debugging.</td></tr>
+          <tr><td><code class="inline">--self-test</code></td><td>Print tool paths and sample ZFS output to diagnose issues.</td></tr>
+          <tr><td><em>trailing args</em></td><td>Dataset names to scan (omit with <code class="inline">-r</code> to scan all).</td></tr>
+        </tbody>
+      </table>
+      <p class="mini">If <code class="inline">--old_drive_count</code>, <code class="inline">--new_drive_count</code>, or <code class="inline">--parity</code> are omitted, the script tries <em>history</em>, then <em>status</em>, and finally assumes a <strong>single‑drive expansion</strong> (N_new = N_cur, N_old = N_cur−1; P from status or 2).</p>
+    </section>
+
+    <section id="examples" class="card kitchen">
+      <h2>“Kitchen‑sink” example (every option)</h2>
+      <pre><code class="language-bash">sudo bash ./get_expansion_ratio.sh \
+  -p Data \
+  -t 5020371 \
+  # --time "2025-08-01 00:00:00" \
+  -r \
+  -o /var/log/zfs-oldnew-$(date +%Y%m%d-%H%M%S).log \
+  --denom physical \
+  --old_drive_count 7 \
+  --new_drive_count 10 \
+  --parity 2 \
+  --progress \
+  --progress-seconds 5 \
+  --progress-gib 2 \
+  --progress-to-log \
+  --check-lines 2048 \
+  --debug \
+  --self-test</code></pre>
+      <p class="mini">Tip: drop <code class="inline">-r</code> and append a dataset (e.g., <code class="inline">Data/Storage/Photos</code>) to scan only that subtree.</p>
+    </section>
+
+    <section id="output" class="card">
+      <h2>Sample output (annotated)</h2>
+      <pre><code>ZFS Old/New Layout Audit
+Started:       2025-08-31T06:00:00Z
+Pool:          Data
+Expansion time: 2025-08-01 00:00:00  -&gt; TXG: 5020371
+Output log:    zfs-oldlayout-report-Data-txg5020371-20250831-060000.log
+Recursion:     disabled
+Explicit datasets provided (1): Data/Storage/Photos
+Detected RAIDZ parities: 2
+Detected widths (N):     7 10
+Assumed Old/New/Parity:  N_old=7, N_new=10, P=2  (source=history)
+Progress:      enabled
+  - progress seconds: 10
+  - progress GiB:     1
+  - check lines:      4096
+  - denom mode:       physical
+  - progress to log:  no
+  - debug tracing:    off
+
+Dataset, OLD_layout_bytes, NEW_layout_bytes, OLD%, NEW%
+[dataset] Data/Storage/Photos size: used=565 GiB, usedbydataset=401 GiB, snaps=0 B, children=0 B (denom=physical pre-pass)
+[estimate] Data/Storage/Photos Old N,P: N=7,P=2; est_physical=~560 GiB | New N,P: N=10,P=2; est_physical=~501 GiB | potential savings: ~59 GiB (~10.5%)
+[progress] Data/Storage/Photos  Total=112 GiB/560 GiB  OLD=112 GiB  NEW=0 B
+...
+Data/Storage/Photos, 606140006400, 0, 100.00, 0.00
+  - Data/Storage/Photos    Total=564 GiB/560 GiB   OLD=564 GiB   NEW=0 B
+
+Overall:
+  OLD-layout total: 564 GiB
+  NEW-layout total: 0 B
+  Processed total:  564 GiB
+  Denominator sum:  560 GiB   # sum of denominators per dataset
+  OLD %: 100.00%
+  NEW %: 0.00%
+  Estimate if ALL data were on OLD width (N=7,P=2): ~560 GiB
+  Estimate if ALL data were on NEW width (N=10,P=2): ~501 GiB
+  Potential savings by rewriting to NEW width: ~59 GiB (~10.5%)
+Finished: 2025-08-31T06:28:38Z</code></pre>
+    </section>
+
+    <section id="troubleshooting" class="card">
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li><strong>awk: syntax error</strong> near <code class="inline">BEGIN { in = ... }</code>: fixed in current version (uses <code class="inline">inside</code> instead of reserved <code class="inline">in</code>).</li>
+        <li><strong>Silent exit</strong> before header: run with <code class="inline">--self-test</code> and/or <code class="inline">--debug</code>. Confirm <code class="inline">zdb</code>, <code class="inline">zfs</code>, <code class="inline">zpool</code> are in PATH and run as root.</li>
+        <li><strong>--time</strong> didn’t map to TXG: script falls back among multiple methods (<code class="inline">zdb -u</code>, label scans via <code class="inline">zdb -l</code>). Use <code class="inline">-t</code> to specify the TXG directly if needed.</li>
+        <li>Totals &gt; denominator: expected with <strong>logical</strong> mode. Use <strong>physical</strong> if you want 0–100% progress.</li>
+      </ul>
+      <div class="callout warn">
+        <strong>GitHub note:</strong> This file uses inline CSS. GitHub displays HTML in a sandbox and should render this styling, but JavaScript is stripped. For absolute control, serve it via GitHub Pages or view locally.
+      </div>
+    </section>
+  </div>
+</body>
+</html>
